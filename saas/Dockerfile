@@ -12,15 +12,37 @@ COPY . .
 
 # Build argument for Clerk public key
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 
-RUN NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY npm run build
+# If the build arg is empty, try to source it from .env as a fallback
+# (or fail with a clear message)
+RUN if [ -z "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" ] && [ -f .env ]; then \
+  export $(grep -v '^#' .env | xargs) && \
+  echo "Using NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY from .env"; \
+  elif [ -z "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" ]; then \
+  echo ""; \
+  echo "=============================================="; \
+  echo " ERROR: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is not set!"; \
+  echo ""; \
+  echo " Either:"; \
+  echo "   1. export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_..."; \
+  echo "      then re-run: docker build --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=\"\$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY\" ..."; \
+  echo ""; \
+  echo "   2. Or create a .env file with:"; \
+  echo "      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_..."; \
+  echo ""; \
+  echo " Get your key at: https://dashboard.clerk.com/last-active?path=api-keys"; \
+  echo "=============================================="; \
+  exit 1; \
+  fi
+
+# Set the env var for the build
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 
 # Note: Docker may warn about "secrets in ARG/ENV" - this is OK!
 # The NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is meant to be public (it starts with pk_)
 
 # Build the Next.js app (creates 'out' directory with static files)
-
+RUN npm run build
 
 # Stage 2: Create the final Python container
 FROM python:3.12-slim
